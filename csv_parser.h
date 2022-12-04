@@ -47,12 +47,13 @@ private:
                 screen_skip = true;
                 goto end;
             }
-            else if (t == '"' && !screen_skip){
+            else if (t == '"' && !screen_skip) {
                 screen_status = !screen_status;
                 goto end;
             }
 
             res->front() += t;
+            screen_skip = false;
             end:
             input.get(t);
         }
