@@ -1,0 +1,3 @@
+/home/mikhail/Documents/csv_parser/build/CMakeFiles/app.dir
+/home/mikhail/Documents/csv_parser/build/CMakeFiles/edit_cache.dir
+/home/mikhail/Documents/csv_parser/build/CMakeFiles/rebuild_cache.dir
