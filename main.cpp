@@ -44,7 +44,7 @@ int main() {
             std::cout << t << std::endl;
         }
     }
-    catch(std::exception e){
-        std::cout << e.what();
+    catch(parser_exception e){
+        std::cerr << e.what();
     }
 }

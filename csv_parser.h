@@ -4,28 +4,53 @@
 #include <string>
 #include <list>
 #include <cassert>
+#include <exception>
+#include <utility>
+#include "config.h"
 
-template<typename Type>
-Type get_item(std::list<std::string>* itemList){
-    std::string itemStr = itemList->front();
-    std::stringstream ss(itemStr);
-    itemList->pop_front();
-    Type item;
-    ss >> item;
-    return item;
-}
+class parser_exception : std::exception {
+    std::string description;
 
-template<>
-inline std::string get_item(std::list<std::string>* itemList) {
-    std::string res = itemList->front();
-    itemList->pop_front();
-    return res;
-}
+public:
+    explicit parser_exception(std::string text) {
+        description = std::move(text);
+    }
+
+    virtual const char* what() const throw()
+    {
+        return description.c_str();
+    }
+};
+
 
 template<typename... Args>
 class CSVParser{
 private:
-    std::list<std::string>* readLine(char sep = ',', char new_line = '\n', char screen='\\') {
+        int line = 0;
+        int column = 0;
+    template<typename Type>
+    Type get_item(std::list<std::string>* itemList){
+        std::string itemStr = itemList->front();
+        std::stringstream ss(itemStr);
+        itemList->pop_front();
+        Type item = Type();
+        Type p;
+        int c = sizeof...(Args) - column;
+        while(ss.rdbuf()->in_avail() != 0) {
+            if (!(ss >> p))
+                throw parser_exception(std::string("argument type does not match at line ") + std::to_string(line)
+                                       + std::string(" column ") + std::to_string(c));
+            item += p;
+            if(typeid(Type) == typeid(std::string) && ss.rdbuf()->in_avail() != 0) {
+                item += ' ';
+            }
+        }
+
+        column++;
+        return item;
+    }
+
+    std::list<std::string>* readLine() {
         auto* res = new std::list<std::string>{""};
         assert(res);
         char t = ' ';
@@ -38,16 +63,16 @@ private:
 
         input.get(t);
 
-        while(t!= new_line && !input.eof()) {
-            if(t == sep && !screen_status){
+        while(t!= line_separator && !input.eof()) {
+            if(t == separator && !screen_status){
                 res->emplace_front("");
                 input.get(t);
                 continue;
-            } else if(t == screen){
+            } else if(t == disable_screen){
                 screen_skip = true;
                 goto end;
             }
-            else if (t == '"' && !screen_skip) {
+            else if (t == screen && !screen_skip) {
                 screen_status = !screen_status;
                 goto end;
             }
@@ -58,7 +83,10 @@ private:
             input.get(t);
         }
         if(screen_status)
-            throw std::string("screen sequence not closed");
+            throw parser_exception(std::string("screen sequence not closed at line ") + std::to_string(line));
+        if(res->size() != sizeof...(Args))
+            throw parser_exception(std::string("argument count does not match at line ") + std::to_string(line));
+        line++;
         return res;
     }
     std::ifstream& input;
@@ -66,7 +94,7 @@ private:
 public:
     CSVParser(std::ifstream& in, int lines_skip) : input(in) {
         if(!in.good())
-            throw "file not found";
+            throw parser_exception("file not found");
         for(int i = 0; i < lines_skip; i++)
             readLine();
         next();
@@ -74,6 +102,7 @@ public:
 
     void next() {
         auto t = readLine();
+        column = 0;
         if(success)
             current_ = std::tuple<Args...>(get_item<Args>(t)...);
         delete t;
